@@ -128,52 +128,56 @@ class _UsersTabState extends ConsumerState<_UsersTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    
+    final usersCount = _users.where((u) => u['role'] == 'USER').length;
+    final orgsCount = _users.where((u) => u['role'] == 'ORGANIZER').length;
+    final adminsCount = _users.where((u) => u['role'] == 'ADMIN').length;
+
     return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 80),
-        itemCount: _users.length,
-        itemBuilder: (context, index) {
-          final u = _users[index];
-          return ListTile(
-            leading: CircleAvatar(child: Text(u['role'][0])),
-            title: Text(u['name'], style: TextStyle(decoration: u['isActive'] == false ? TextDecoration.lineThrough : null)),
-            subtitle: Text(u['email']),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(u['role'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: Icon(u['isActive'] == false ? Icons.lock : Icons.lock_open, color: u['isActive'] == false ? Colors.red : Colors.green),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Xác nhận Khóa / Mở Khóa'),
-                        content: Text('Bạn có chắc chắn muốn ${u['isActive'] == false ? 'MỞ KHÓA' : 'KHÓA'} tài khoản ${u['name']}?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: u['isActive'] == false ? Colors.green : Colors.red),
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              try {
-                                await ref.read(adminRepositoryProvider).toggleUserLock(u['id']);
-                                _loadUsers();
-                              } catch (e) {
-                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                              }
-                            },
-                            child: const Text('Thực hiện', style: TextStyle(color: Colors.white)),
-                          )
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (adminsCount > 0)
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Colors.purple, foregroundColor: Colors.white, child: Text('A')),
+                title: const Text('Quản trị viên (ADMIN)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('Số lượng: $adminsCount'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => const RoleUsersScreen(title: 'Quản trị viên', role: 'ADMIN')
+                  )).then((_) => _loadUsers());
+                },
+              ),
             ),
-          );
-        },
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.blue, foregroundColor: Colors.white, child: Text('O')),
+              title: const Text('Ban tổ chức (ORGANIZER)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Số lượng: $orgsCount'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const RoleUsersScreen(title: 'Ban tổ chức', role: 'ORGANIZER')
+                )).then((_) => _loadUsers());
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.green, foregroundColor: Colors.white, child: Text('U')),
+              title: const Text('Khán giả (USER)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Số lượng: $usersCount'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const RoleUsersScreen(title: 'Khán giả', role: 'USER')
+                )).then((_) => _loadUsers());
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateUserDialog,
@@ -182,6 +186,7 @@ class _UsersTabState extends ConsumerState<_UsersTab> {
     );
   }
 }
+
 
 class _EventsTab extends ConsumerStatefulWidget {
   const _EventsTab();
@@ -394,6 +399,7 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
   List<dynamic> _checkIns = [];
   bool _loading = true;
   String? _token;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -452,26 +458,141 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
-      itemCount: _checkIns.length,
-      itemBuilder: (context, index) {
-        final c = _checkIns[index];
-        return ListTile(
-          onTap: () => _showCheckInDetail(c),
-          leading: c['photoUrl'] != null 
-              ? Image.network(
-                  '${AppConfig.baseUrl}${c['photoUrl']}',
-                  width: 50, height: 50, fit: BoxFit.cover,
-                  headers: _token != null ? {'Authorization': 'Bearer $_token'} : null,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-                )
-              : const Icon(Icons.person, size: 50),
-          title: Text('${c['attendeeName']} - ${c['ticketCode']}'),
-          subtitle: Text('Sự kiện: ${c['eventTitle']}\nNgười check-in: ${c['checkedInBy']['name']}'),
-          isThreeLine: true,
-        );
-      },
+    
+    final filteredCheckIns = _checkIns.where((c) {
+      final code = (c['ticketCode'] ?? '').toString().toLowerCase();
+      final name = (c['attendeeName'] ?? '').toString().toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return code.contains(query) || name.contains(query);
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: TextField(
+            decoration: InputDecoration(
+              labelText: 'Tìm kiếm theo tên hoặc mã vé',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onChanged: (val) {
+              setState(() => _searchQuery = val);
+            },
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: filteredCheckIns.length,
+            itemBuilder: (context, index) {
+              final c = filteredCheckIns[index];
+              return ListTile(
+                onTap: () => _showCheckInDetail(c),
+                leading: c['photoUrl'] != null 
+                    ? Image.network(
+                        '${AppConfig.baseUrl}${c['photoUrl']}',
+                        width: 50, height: 50, fit: BoxFit.cover,
+                        headers: _token != null ? {'Authorization': 'Bearer $_token'} : null,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                      )
+                    : const Icon(Icons.person, size: 50),
+                title: Text('${c['attendeeName']} - ${c['ticketCode']}'),
+                subtitle: Text('Sự kiện: ${c['eventTitle']}\nNgười check-in: ${c['checkedInBy']['name']}'),
+                isThreeLine: true,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class RoleUsersScreen extends ConsumerStatefulWidget {
+  final String title;
+  final String role;
+  const RoleUsersScreen({super.key, required this.title, required this.role});
+
+  @override
+  ConsumerState<RoleUsersScreen> createState() => _RoleUsersScreenState();
+}
+
+class _RoleUsersScreenState extends ConsumerState<RoleUsersScreen> {
+  List<dynamic> _users = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() => _loading = true);
+    try {
+      final allUsers = await ref.read(adminRepositoryProvider).getUsers();
+      _users = allUsers.where((u) => u['role'] == widget.role).toList();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> u) {
+    return ListTile(
+      leading: CircleAvatar(child: Text(u['role'][0])),
+      title: Text(u['name'], style: TextStyle(decoration: u['isActive'] == false ? TextDecoration.lineThrough : null)),
+      subtitle: Text(u['email']),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(u['role'], style: const TextStyle(fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: Icon(u['isActive'] == false ? Icons.lock : Icons.lock_open, color: u['isActive'] == false ? Colors.red : Colors.green),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Xác nhận Khóa / Mở Khóa'),
+                  content: Text('Bạn có chắc chắn muốn ${u['isActive'] == false ? 'MỞ KHÓA' : 'KHÓA'} tài khoản ${u['name']}?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: u['isActive'] == false ? Colors.green : Colors.red),
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        try {
+                          await ref.read(adminRepositoryProvider).toggleUserLock(u['id']);
+                          _loadUsers();
+                        } catch (e) {
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                        }
+                      },
+                      child: const Text('Thực hiện', style: TextStyle(color: Colors.white)),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Danh sách ' + widget.title)),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _users.length,
+              itemBuilder: (context, index) => _buildUserTile(_users[index]),
+            ),
     );
   }
 }
