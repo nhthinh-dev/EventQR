@@ -283,7 +283,17 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                 onTap: () => pickDateTime(context, false),
               ),
               TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Sức chứa'), keyboardType: TextInputType.number),
-              TextField(controller: statusCtrl, decoration: const InputDecoration(labelText: 'Trạng thái (OPEN/CLOSED/CANCELLED)')),
+              DropdownButtonFormField<String>(
+              value: ['OPEN', 'CLOSED'].contains(statusCtrl.text) ? statusCtrl.text : 'OPEN',
+              decoration: const InputDecoration(labelText: 'Trạng thái'),
+              items: const [
+                DropdownMenuItem(value: 'OPEN', child: Text('OPEN (Mở)')),
+                DropdownMenuItem(value: 'CLOSED', child: Text('CLOSED (Đóng/Hết hạn)')),
+              ],
+              onChanged: (val) {
+                if (val != null) statusCtrl.text = val;
+              },
+            ),
             ],
           ),
         ),

@@ -14,9 +14,9 @@ import java.util.Optional;
 public interface EventRepository extends JpaRepository<Event, Long> {
     Page<Event> findByStatus(EventStatus status, Pageable pageable);
     Page<Event> findByStatusAndStartTimeAfter(EventStatus status, java.time.LocalDateTime time, Pageable pageable);
+    Page<Event> findByStartTimeAfter(java.time.LocalDateTime time, Pageable pageable);
     List<Event> findByOrganizerId(Long organizerId);
     
-    // Pessimistic Lock Ä‘á»ƒ chá»‘ng vÆ°á»£t capacity khi Ä‘Äƒng kÃ½
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Event e where e.id = :id")
     Optional<Event> findByIdForUpdate(@Param("id") Long id);

@@ -33,9 +33,9 @@ public class EventService {
         org.springframework.data.domain.Pageable pageable = PageRequest.of(page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
         
         if (upcoming) {
-            eventPage = eventRepository.findByStatusAndStartTimeAfter(EventStatus.OPEN, java.time.LocalDateTime.now(), pageable);
+            eventPage = eventRepository.findByStartTimeAfter(java.time.LocalDateTime.now(), pageable);
         } else {
-            eventPage = eventRepository.findByStatus(EventStatus.OPEN, pageable);
+            eventPage = eventRepository.findAll(pageable);
         }
         
         List<EventResponse> content = eventPage.getContent().stream()
@@ -73,7 +73,7 @@ public class EventService {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .capacity(request.getCapacity())
-                .status(EventStatus.OPEN)
+                .status(request.getStatus() != null ? EventStatus.valueOf(request.getStatus().toUpperCase()) : EventStatus.OPEN)
                 .build();
                 
         event = eventRepository.save(event);
