@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
@@ -83,4 +84,18 @@ class AdminRepository {
       throw AppException.fromDio(e);
     }
   }
+
+  Future<String> uploadImage(File file) async {
+    try {
+      String fileName = file.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "file": await MultipartFile.fromFile(file.path, filename: fileName),
+      });
+      final response = await _dio.post('/api/admin/upload-image', data: formData);
+      return response.data['imageUrl'] as String;
+    } on DioException catch (e) {
+      throw AppException.fromDio(e);
+    }
+  }
+
 }

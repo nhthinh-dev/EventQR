@@ -8,6 +8,7 @@ class EventResponse {
   final int totalTickets;
   final int availableTickets;
   final String status;
+  final String? imageUrl;
 
   EventResponse({
     required this.id,
@@ -19,6 +20,7 @@ class EventResponse {
     required this.totalTickets,
     required this.availableTickets,
     required this.status,
+    this.imageUrl,
   });
 
   factory EventResponse.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class EventResponse {
       totalTickets: json['capacity'] ?? 0,
       availableTickets: json['remainingSeats'] ?? 0,
       status: json['status'] ?? 'UNKNOWN',
+      imageUrl: json['imageUrl'],
     );
   }
 }

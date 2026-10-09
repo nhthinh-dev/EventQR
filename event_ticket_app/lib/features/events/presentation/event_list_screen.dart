@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/config/app_config.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
@@ -57,63 +58,102 @@ class EventListScreen extends ConsumerWidget {
                 final formatter = DateFormat('dd/MM/yyyy HH:mm');
 
                 return Card(
-                  elevation: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => context.push('/events/detail', extra: event),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          event.title,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Expanded(child: Text(event.location, style: const TextStyle(color: Colors.grey))),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Text('${formatter.format(event.startTime)} - ${formatter.format(event.endTime)}', 
-                                style: const TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: event.availableTickets > 0 ? Colors.green.shade100 : Colors.red.shade100,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                event.availableTickets > 0 ? 'Còn ${event.availableTickets} vé' : 'Hết vé',
-                                style: TextStyle(
-                                  color: event.availableTickets > 0 ? Colors.green.shade800 : Colors.red.shade800,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        // Ảnh Bìa
+                        if (event.imageUrl != null && event.imageUrl!.isNotEmpty)
+                          Image.network(
+                            AppConfig.baseUrl + event.imageUrl!,
+                            height: 160,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => Container(
+                              height: 160,
+                              width: double.infinity,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                            ),
+                          )
+                        else
+                          Container(
+                            height: 160,
+                            width: double.infinity,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF1E1E2C), Color(0xFFFF6E40)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
                             ),
-                            ElevatedButton(
-                              onPressed: () {
-                                // Điều hướng sang màn hình Chi tiết và truyền dữ liệu sự kiện theo
-                                context.push('/events/detail', extra: event);
-                              },
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                              child: const Text('XEM CHI TIẾT'),
-                            )
-                          ],
-                        )
+                            child: const Center(
+                              child: Icon(Icons.event, size: 60, color: Colors.white54),
+                            ),
+                          ),
+                        
+                        // Nội dung
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                event.title,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Expanded(child: Text(event.location, style: const TextStyle(color: Colors.grey, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(formatter.format(event.startTime), style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: event.availableTickets > 0 ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      event.availableTickets > 0 ? 'Còn ${event.availableTickets} vé' : 'Hết vé',
+                                      style: TextStyle(
+                                        color: event.availableTickets > 0 ? Colors.green : Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      minimumSize: Size.zero,
+                                    ),
+                                    onPressed: () => context.push('/events/detail', extra: event),
+                                    child: const Text('Xem chi tiết', style: TextStyle(fontSize: 13)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

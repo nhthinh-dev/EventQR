@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../data/admin_repository.dart';
@@ -237,6 +239,9 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
     final endCtrl = TextEditingController(text: selectedEnd.toIso8601String().split('.')[0]);
     final capacityCtrl = TextEditingController(text: event?.totalTickets.toString() ?? '100');
     final statusCtrl = TextEditingController(text: event?.status ?? 'OPEN');
+    
+    File? selectedImage;
+    String? currentImageUrl = event?.imageUrl;
 
     Future<void> pickDateTime(BuildContext context, bool isStart) async {
       final initialDate = isStart ? selectedStart : selectedEnd;
@@ -266,73 +271,144 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(event == null ? 'Tạo sự kiện mới' : 'Sửa sự kiện'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tên sự kiện')),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Mô tả')),
-              TextField(controller: locationCtrl, decoration: const InputDecoration(labelText: 'Địa điểm')),
-              TextField(
-                controller: startCtrl, 
-                decoration: const InputDecoration(labelText: 'Bắt đầu', suffixIcon: Icon(Icons.calendar_month)),
-                readOnly: true,
-                onTap: () => pickDateTime(context, true),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          bool isUploading = false;
+          
+          Future<void> pickImage() async {
+            final ImagePicker picker = ImagePicker();
+            final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+            if (image != null) {
+              setStateDialog(() {
+                selectedImage = File(image.path);
+              });
+            }
+          }
+          
+          return AlertDialog(
+            title: Text(event == null ? 'Tạo sự kiện mới' : 'Sửa sự kiện'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: pickImage,
+                    child: Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[400]!),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: selectedImage != null
+                          ? Image.file(selectedImage!, fit: BoxFit.cover)
+                          : (currentImageUrl != null && currentImageUrl!.isNotEmpty)
+                              ? Image.network(
+                                  AppConfig.baseUrl + currentImageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Icon(Icons.image, size: 50, color: Colors.grey),
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
+                                    SizedBox(height: 8),
+                                    Text('Thêm ảnh bìa (Tùy chọn)', style: TextStyle(color: Colors.grey)),
+                                  ],
+                                ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tên sự kiện')),
+                  const SizedBox(height: 16),
+                  TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Mô tả')),
+                  const SizedBox(height: 16),
+                  TextField(controller: locationCtrl, decoration: const InputDecoration(labelText: 'Địa điểm')),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: startCtrl, 
+                    decoration: const InputDecoration(labelText: 'Bắt đầu', suffixIcon: Icon(Icons.calendar_month)),
+                    readOnly: true,
+                    onTap: () => pickDateTime(context, true),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: endCtrl, 
+                    decoration: const InputDecoration(labelText: 'Kết thúc', suffixIcon: Icon(Icons.calendar_month)),
+                    readOnly: true,
+                    onTap: () => pickDateTime(context, false),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Sức chứa'), keyboardType: TextInputType.number),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: ['OPEN', 'CLOSED'].contains(statusCtrl.text) ? statusCtrl.text : 'OPEN',
+                    decoration: const InputDecoration(labelText: 'Trạng thái'),
+                    items: const [
+                      DropdownMenuItem(value: 'OPEN', child: Text('OPEN (Mở)')),
+                      DropdownMenuItem(value: 'CLOSED', child: Text('CLOSED (Đóng)')),
+                    ],
+                    onChanged: (v) => statusCtrl.text = v ?? 'OPEN',
+                  ),
+                ],
               ),
-              TextField(
-                controller: endCtrl, 
-                decoration: const InputDecoration(labelText: 'Kết thúc', suffixIcon: Icon(Icons.calendar_month)),
-                readOnly: true,
-                onTap: () => pickDateTime(context, false),
-              ),
-              TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Sức chứa'), keyboardType: TextInputType.number),
-              DropdownButtonFormField<String>(
-              value: ['OPEN', 'CLOSED'].contains(statusCtrl.text) ? statusCtrl.text : 'OPEN',
-              decoration: const InputDecoration(labelText: 'Trạng thái'),
-              items: const [
-                DropdownMenuItem(value: 'OPEN', child: Text('OPEN (Mở)')),
-                DropdownMenuItem(value: 'CLOSED', child: Text('CLOSED (Đóng/Hết hạn)')),
-              ],
-              onChanged: (val) {
-                if (val != null) statusCtrl.text = val;
-              },
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context), 
+                child: const Text('Hủy')
+              ),
+              ElevatedButton(
+                onPressed: isUploading ? null : () async {
+                  setStateDialog(() => isUploading = true);
+                  try {
+                    String finalImageUrl = currentImageUrl ?? '';
+                    
+                    if (selectedImage != null) {
+                      finalImageUrl = await ref.read(adminRepositoryProvider).uploadImage(selectedImage!);
+                    }
+
+                    final req = {
+                      'title': titleCtrl.text,
+                      'description': descCtrl.text,
+                      'location': locationCtrl.text,
+                      'startTime': selectedStart.toUtc().toIso8601String(),
+                      'endTime': selectedEnd.toUtc().toIso8601String(),
+                      'capacity': int.tryParse(capacityCtrl.text) ?? 100,
+                      'status': statusCtrl.text,
+                      'imageUrl': finalImageUrl.isNotEmpty ? finalImageUrl : null,
+                    };
+                    
+                    if (event == null) {
+                      await ref.read(adminRepositoryProvider).createEvent(req);
+                    } else {
+                      await ref.read(adminRepositoryProvider).updateEvent(event.id, req);
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      _loadEvents();
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                    }
+                  } finally {
+                    setStateDialog(() => isUploading = false);
+                  }
+                },
+                child: isUploading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                    : const Text('Lưu'),
+              ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final req = {
-                  'title': titleCtrl.text,
-                  'description': descCtrl.text,
-                  'location': locationCtrl.text,
-                  'startTime': selectedStart.toUtc().toIso8601String(),
-                  'endTime': selectedEnd.toUtc().toIso8601String(),
-                  'capacity': int.tryParse(capacityCtrl.text) ?? 100,
-                  'status': statusCtrl.text,
-                };
-                if (event == null) {
-                  await ref.read(adminRepositoryProvider).createEvent(req);
-                } else {
-                  await ref.read(adminRepositoryProvider).updateEvent(event.id, req);
-                }
-                if (context.mounted) Navigator.pop(context);
-                _loadEvents();
-              } catch (e) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-              }
-            },
-            child: Text(event == null ? 'Tạo' : 'Lưu'),
-          )
-        ],
+          );
+        }
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

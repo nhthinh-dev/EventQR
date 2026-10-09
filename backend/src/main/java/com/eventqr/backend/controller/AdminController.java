@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import com.eventqr.backend.service.FileStorageService;
 
 import java.util.List;
 
@@ -17,6 +19,8 @@ import java.util.List;
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 public class AdminController {
+
+    private final FileStorageService fileStorageService;
 
     private final AdminService adminService;
 
@@ -42,4 +46,13 @@ public class AdminController {
         adminService.toggleUserLock(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping(value = "/upload-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<java.util.Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
+        String photoUrl = fileStorageService.storeFile(file);
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("imageUrl", photoUrl);
+        return ResponseEntity.ok(response);
+    }
+
 }

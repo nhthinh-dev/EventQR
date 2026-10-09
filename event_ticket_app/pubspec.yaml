@@ -43,6 +43,7 @@ dependencies:
   intl: ^0.20.3
   cached_network_image: ^3.4.1
   image_picker: ^1.2.2
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:

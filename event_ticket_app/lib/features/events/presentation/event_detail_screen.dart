@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/config/app_config.dart';
 import 'package:intl/intl.dart';
 import '../data/models/event_response.dart';
 import '../data/event_repository.dart';
@@ -76,8 +77,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chi tiết sự kiện'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -85,7 +85,48 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Tiêu đề
-            Text(event.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
+                          if (event.imageUrl != null && event.imageUrl!.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    AppConfig.baseUrl + event.imageUrl!,
+                    width: double.infinity,
+                    height: 220,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(
+                      width: double.infinity,
+                      height: 220,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF1E1E2C), Color(0xFFFF6E40)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.event, size: 60, color: Colors.white54),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E1E2C), Color(0xFFFF6E40)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.event, size: 60, color: Colors.white54),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text(event.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             
             // Thời gian và Địa điểm

@@ -53,7 +53,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.qr_code_scanner, size: 80, color: Colors.blue),
+            Icon(Icons.qr_code_scanner, size: 80, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 32),
             TextField(
               controller: _emailCtrl,
@@ -61,8 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Email',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
+                                prefixIcon: Icon(Icons.email),
               ),
             ),
             const SizedBox(height: 16),
@@ -70,8 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               controller: _passCtrl,
               decoration: const InputDecoration(
                 labelText: 'Mật khẩu',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
+                                prefixIcon: Icon(Icons.lock),
               ),
               obscureText: true,
               textInputAction: TextInputAction.done,
