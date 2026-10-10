@@ -15,18 +15,22 @@ public class TicketResponse {
     private Long eventId;
     private String eventTitle;
     private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private String location;
+    private Integer cancelDeadlineHours;
 
     public static TicketResponse from(Ticket ticket) {
         Event event = ticket.getBooking().getEvent();
         return TicketResponse.builder()
                 .ticketId(ticket.getId())
                 .ticketCode(ticket.getTicketCode())
-                .status(ticket.getStatus().name())
+                .status(ticket.getBooking().getStatus() == com.eventqr.backend.entity.enums.BookingStatus.CANCELLED ? "CANCELLED" : ticket.getStatus().name())
                 .eventId(event.getId())
                 .eventTitle(event.getTitle())
                 .startTime(event.getStartTime())
+                .endTime(event.getEndTime())
                 .location(event.getLocation())
+                .cancelDeadlineHours(event.getCancelDeadlineHours())
                 .build();
     }
 }

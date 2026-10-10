@@ -34,6 +34,19 @@ public class AdminController {
         return new ResponseEntity<>(adminService.createUser(request), HttpStatus.CREATED);
     }
 
+    @GetMapping("/events-checkin-summary")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getEventsCheckInSummary() {
+        return ResponseEntity.ok(adminService.getEventsCheckInSummary());
+    }
+
+    @GetMapping("/events/{eventId}/check-ins")
+    public ResponseEntity<PageResponse<CheckInHistoryResponse>> getCheckInsByEvent(
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(adminService.getCheckInsByEvent(eventId, page, size));
+    }
+
     @GetMapping("/check-ins")
     public ResponseEntity<PageResponse<CheckInHistoryResponse>> getAllCheckIns(
             @RequestParam(defaultValue = "0") int page,

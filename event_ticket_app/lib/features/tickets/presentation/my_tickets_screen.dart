@@ -69,8 +69,62 @@ class MyTicketsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    trailing: const Icon(Icons.qr_code_2, size: 40, color: Colors.blue),
-                    onTap: () {
+                                        trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isValid)
+                          IconButton(
+                            icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                            tooltip: 'Hủy vé',
+                            onPressed: () {
+                              if (ticket.endTime.difference(DateTime.now()).inHours >= ticket.cancelDeadlineHours) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Hủy Vé', style: TextStyle(color: Colors.red)),
+                                    content: const Text('BẠN CÓ CHẮC CHẮN MUỐN HỦY VÉ?\n\nHành động này không thể hoàn tác. Sức chứa sẽ được hoàn lại cho người khác.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('ĐÓNG')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                        onPressed: () async {
+                                          Navigator.pop(context);
+                                          try {
+                                            await ref.read(ticketRepositoryProvider).cancelTicket(ticket.ticketId);
+                                            ref.invalidate(myTicketsFutureProvider);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã hủy vé thành công!')));
+                                            }
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                            }
+                                          }
+                                        },
+                                        child: const Text('HỦY VÉ'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } else {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Không thể hủy vé', style: TextStyle(color: Colors.orange)),
+                                    content: Text('Đã vượt quá thời hạn cho phép.\n\nBạn chỉ có thể hủy vé muộn nhất là ${ticket.cancelDeadlineHours} giờ trước hạn chót.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('ĐÃ HIỂU'))
+                                    ],
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        const Icon(Icons.qr_code_2, size: 40, color: Colors.blue),
+                      ],
+                    ),
+
+                    onTap: ticket.status == 'CANCELLED' ? null : () {
                       showDialog(
                         context: context,
                         builder: (context) => AlertDialog(

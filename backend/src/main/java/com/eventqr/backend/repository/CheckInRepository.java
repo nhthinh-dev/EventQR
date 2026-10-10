@@ -11,4 +11,8 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"ticket.booking.user", "ticket.booking.event", "checkedInBy"})
     org.springframework.data.domain.Page<CheckIn> findAllByOrderByCheckedInAtDesc(org.springframework.data.domain.Pageable pageable);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"ticket.booking.user", "ticket.booking.event", "checkedInBy"})
+    org.springframework.data.domain.Page<com.eventqr.backend.entity.CheckIn> findByTicketBookingEventIdOrderByCheckedInAtDesc(Long eventId, org.springframework.data.domain.Pageable pageable);
+
+    long countByTicketBookingEventId(Long eventId);
 }

@@ -22,6 +22,7 @@ public enum ErrorCode {
     INVALID_ROLE(HttpStatus.BAD_REQUEST, "Quyền không hợp lệ."),
     PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "Vui lòng chụp ảnh khách hàng trước khi xác nhận."),
     CHECKIN_TOO_EARLY(HttpStatus.BAD_REQUEST, "Chưa đến giờ mở cửa soát vé cho sự kiện này!"),
+    CANCEL_TOO_LATE(HttpStatus.BAD_REQUEST, "Đã qua thời hạn hủy vé (chỉ được hủy trước 3 ngày)"),
     ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "Tài khoản của bạn đã bị khóa!"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Đã có lỗi xảy ra.");
 

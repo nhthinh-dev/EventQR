@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 public class AdminService {
     private final UserRepository userRepository;
     private final CheckInRepository checkInRepository;
+    private final com.eventqr.backend.repository.EventRepository eventRepository;
     private final PasswordEncoder passwordEncoder;
 
     public List<UserAdminResponse> getAllUsers() {
@@ -98,6 +99,48 @@ public class AdminService {
                 .collect(Collectors.toList());
                 
         return PageResponse.<CheckInHistoryResponse>builder()
+                .content(content)
+                .page(checkInPage.getNumber())
+                .size(checkInPage.getSize())
+                .totalPages(checkInPage.getTotalPages())
+                .last(checkInPage.isLast())
+                .build();
+    }
+
+        public java.util.List<java.util.Map<String, Object>> getEventsCheckInSummary() {
+        java.util.List<com.eventqr.backend.entity.Event> events = eventRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
+        return events.stream().map(event -> {
+            long checkInCount = checkInRepository.countByTicketBookingEventId(event.getId());
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", event.getId());
+            map.put("title", event.getTitle());
+            map.put("imageUrl", event.getImageUrl());
+            map.put("checkInCount", checkInCount);
+            return map;
+        }).collect(java.util.stream.Collectors.toList());
+    }
+
+    public com.eventqr.backend.dto.PageResponse<com.eventqr.backend.dto.CheckInHistoryResponse> getCheckInsByEvent(Long eventId, int page, int size) {
+        org.springframework.data.domain.Page<com.eventqr.backend.entity.CheckIn> checkInPage = checkInRepository.findByTicketBookingEventIdOrderByCheckedInAtDesc(eventId, org.springframework.data.domain.PageRequest.of(page, size));
+        java.util.List<com.eventqr.backend.dto.CheckInHistoryResponse> content = checkInPage.getContent().stream()
+                .map(ci -> com.eventqr.backend.dto.CheckInHistoryResponse.builder()
+                        .checkInId(ci.getId())
+                        .ticketCode(ci.getTicket().getTicketCode())
+                        .attendeeName(ci.getTicket().getBooking().getUser().getName())
+                        .attendeeEmail(ci.getTicket().getBooking().getUser().getEmail())
+                        .attendeePhone(ci.getTicket().getBooking().getUser().getPhone())
+                        .attendeeDob(ci.getTicket().getBooking().getUser().getDob())
+                        .eventTitle(ci.getTicket().getBooking().getEvent().getTitle())
+                        .checkedInAt(ci.getCheckedInAt())
+                        .photoUrl(ci.getPhotoUrl())
+                        .checkedInBy(com.eventqr.backend.dto.CheckInHistoryResponse.CheckedInByDto.builder()
+                                .id(ci.getCheckedInBy().getId())
+                                .name(ci.getCheckedInBy().getName())
+                                .email(ci.getCheckedInBy().getEmail())
+                                .build())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+        return com.eventqr.backend.dto.PageResponse.<com.eventqr.backend.dto.CheckInHistoryResponse>builder()
                 .content(content)
                 .page(checkInPage.getNumber())
                 .size(checkInPage.getSize())

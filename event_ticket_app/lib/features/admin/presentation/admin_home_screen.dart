@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/config/app_config.dart';
@@ -238,6 +239,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
     final startCtrl = TextEditingController(text: selectedStart.toIso8601String().split('.')[0]);
     final endCtrl = TextEditingController(text: selectedEnd.toIso8601String().split('.')[0]);
     final capacityCtrl = TextEditingController(text: event?.totalTickets.toString() ?? '100');
+      final cancelDeadlineCtrl = TextEditingController(text: event?.cancelDeadlineHours.toString() ?? '72');
     final statusCtrl = TextEditingController(text: event?.status ?? 'OPEN');
     
     File? selectedImage;
@@ -343,6 +345,8 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   const SizedBox(height: 16),
                   TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Sức chứa'), keyboardType: TextInputType.number),
                   const SizedBox(height: 16),
+                  TextField(controller: cancelDeadlineCtrl, decoration: const InputDecoration(labelText: 'Giờ hạn chót hủy vé (Ví dụ: 72)'), keyboardType: TextInputType.number),
+                  const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: ['OPEN', 'CLOSED'].contains(statusCtrl.text) ? statusCtrl.text : 'OPEN',
                     decoration: const InputDecoration(labelText: 'Trạng thái'),
@@ -377,6 +381,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                       'startTime': selectedStart.toUtc().toIso8601String(),
                       'endTime': selectedEnd.toUtc().toIso8601String(),
                       'capacity': int.tryParse(capacityCtrl.text) ?? 100,
+                      'cancelDeadlineHours': int.tryParse(cancelDeadlineCtrl.text) ?? 72,
                       'status': statusCtrl.text,
                       'imageUrl': finalImageUrl.isNotEmpty ? finalImageUrl : null,
                     };
@@ -472,6 +477,410 @@ class _CheckInsTab extends ConsumerStatefulWidget {
 }
 
 class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
+  List<Map<String, dynamic>> _eventsSummary = [];
+  bool _loading = true;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEventsSummary();
+  }
+
+  Future<void> _loadEventsSummary() async {
+    setState(() => _loading = true);
+    try {
+      _eventsSummary = await ref.read(adminRepositoryProvider).getEventsCheckInSummary();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    
+    final filteredEvents = _eventsSummary.where((e) {
+      final title = (e['title'] ?? '').toString().toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return title.contains(query);
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: TextField(
+            decoration: InputDecoration(
+              labelText: 'Tìm kiếm sự kiện',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onChanged: (val) {
+              setState(() => _searchQuery = val);
+            },
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: filteredEvents.length,
+            itemBuilder: (context, index) {
+              final e = filteredEvents[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: ListTile(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => _EventStatsDashboardScreen(
+                          eventId: e['id'],
+                          eventTitle: e['title'],
+                        ),
+                      ),
+                    );
+                  },
+                  leading: e['imageUrl'] != null 
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          AppConfig.baseUrl + e['imageUrl'],
+                          width: 50, height: 50, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.event, size: 50),
+                        ),
+                      )
+                    : const Icon(Icons.event, size: 50),
+                  title: Text(e['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Đã check-in: ${e['checkInCount']} vé'),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EventStatsDashboardScreen extends ConsumerStatefulWidget {
+  final int eventId;
+  final String eventTitle;
+  const _EventStatsDashboardScreen({required this.eventId, required this.eventTitle});
+
+  @override
+  ConsumerState<_EventStatsDashboardScreen> createState() => _EventStatsDashboardScreenState();
+}
+
+class _EventStatsDashboardScreenState extends ConsumerState<_EventStatsDashboardScreen> {
+  Map<String, dynamic>? _eventDetail;
+  List<Map<String, dynamic>> _attendees = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final repo = ref.read(adminRepositoryProvider);
+      final futures = await Future.wait([
+        repo.getEventDetail(widget.eventId),
+        repo.getEventAttendees(widget.eventId),
+      ]);
+      _eventDetail = futures[0] as Map<String, dynamic>;
+      _attendees = futures[1] as List<Map<String, dynamic>>;
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return Scaffold(appBar: AppBar(title: Text('Thống kê: ${widget.eventTitle}')), body: const Center(child: CircularProgressIndicator()));
+
+    final capacity = _eventDetail?['capacity'] ?? 0;
+    final totalRegistered = _attendees.length;
+    final checkedIn = _attendees.where((a) => a['ticketStatus'] == 'CHECKED_IN').length;
+    final notCheckedIn = totalRegistered - checkedIn;
+    final rate = totalRegistered == 0 ? 0.0 : (checkedIn / totalRegistered * 100);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Thống kê sự kiện'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.eventTitle, style: const TextStyle(fontSize: 18, color: Colors.grey)),
+            const SizedBox(height: 16),
+            const Text('1. Thẻ số liệu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => _EventAttendeeListScreen(
+                        title: 'Đã đăng ký',
+                        attendees: _attendees,
+                      )));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.confirmation_num_outlined, color: Colors.blue.shade700),
+                          const SizedBox(height: 8),
+                          Text('Đã đăng ký', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                          Text('$totalRegistered/$capacity', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => _EventCheckInDetailScreen(
+                        eventId: widget.eventId,
+                        eventTitle: widget.eventTitle,
+                      )));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.how_to_reg, color: Colors.green.shade700),
+                          const SizedBox(height: 8),
+                          Text('Đã check-in', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                          Text('$checkedIn', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      final list = _attendees.where((a) => a['ticketStatus'] != 'CHECKED_IN').toList();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => _EventAttendeeListScreen(
+                        title: 'Chưa check-in',
+                        attendees: list,
+                      )));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.transparent),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Chưa check-in', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                          Text('$notCheckedIn', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Tỷ lệ check-in', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Text('2. Biểu đồ vòng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 250,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: totalRegistered == 0 
+                      ? const Center(child: Text('Chưa có dữ liệu')) 
+                      : Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            PieChart(
+                              PieChartData(
+                                sectionsSpace: 0,
+                                centerSpaceRadius: 70,
+                                sections: [
+                                  PieChartSectionData(
+                                    color: Colors.green.shade600,
+                                    value: checkedIn.toDouble(),
+                                    title: '',
+                                    radius: 30,
+                                  ),
+                                  PieChartSectionData(
+                                    color: Colors.grey.shade300,
+                                    value: notCheckedIn.toDouble(),
+                                    title: '',
+                                    radius: 30,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                                const Text('Đã check-in', style: TextStyle(color: Colors.black54)),
+                              ],
+                            ),
+                          ],
+                        ),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(width: 16, height: 16, decoration: BoxDecoration(color: Colors.green.shade600, shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Text('Đã vào: $checkedIn', style: const TextStyle(fontSize: 16)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Container(width: 16, height: 16, decoration: BoxDecoration(color: Colors.grey.shade300, shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Text('Chưa vào: $notCheckedIn', style: const TextStyle(fontSize: 16)),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Text('$totalRegistered vé đăng ký', style: const TextStyle(fontSize: 16, color: Colors.black87)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EventAttendeeListScreen extends StatefulWidget {
+  final String title;
+  final List<Map<String, dynamic>> attendees;
+  const _EventAttendeeListScreen({required this.title, required this.attendees});
+
+  @override
+  State<_EventAttendeeListScreen> createState() => _EventAttendeeListScreenState();
+}
+
+class _EventAttendeeListScreenState extends State<_EventAttendeeListScreen> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.attendees.where((a) {
+      final code = (a['ticketCode'] ?? '').toString().toLowerCase();
+      final name = (a['name'] ?? '').toString().toLowerCase();
+      final q = _searchQuery.toLowerCase();
+      return code.contains(q) || name.contains(q);
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title)),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              decoration: InputDecoration(
+                labelText: 'Tìm kiếm tên hoặc mã vé',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onChanged: (val) => setState(() => _searchQuery = val),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final a = filtered[index];
+                final isCheckedIn = a['ticketStatus'] == 'CHECKED_IN';
+                return ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text('${a['name']} - ${a['ticketCode']}'),
+                  subtitle: Text('Email: ${a['email']}'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isCheckedIn ? Colors.green.shade100 : Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isCheckedIn ? 'Đã check-in' : 'Chưa check-in',
+                      style: TextStyle(color: isCheckedIn ? Colors.green.shade800 : Colors.orange.shade800, fontSize: 12),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _EventCheckInDetailScreen extends ConsumerStatefulWidget {
+  final int eventId;
+  final String eventTitle;
+  const _EventCheckInDetailScreen({required this.eventId, required this.eventTitle});
+
+  @override
+  ConsumerState<_EventCheckInDetailScreen> createState() => _EventCheckInDetailScreenState();
+}
+
+class _EventCheckInDetailScreenState extends ConsumerState<_EventCheckInDetailScreen> {
   List<dynamic> _checkIns = [];
   bool _loading = true;
   String? _token;
@@ -486,7 +895,7 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
   Future<void> _loadCheckIns() async {
     setState(() => _loading = true);
     try {
-      _checkIns = await ref.read(adminRepositoryProvider).getCheckIns(0, 50);
+      _checkIns = await ref.read(adminRepositoryProvider).getCheckInsByEvent(widget.eventId, 0, 100);
       _token = await ref.read(tokenStorageProvider).read(); 
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -518,7 +927,6 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
               if (c['attendeeDob'] != null) Text('Ngày sinh: ${c['attendeeDob']}'),
               Text('Mã vé: ${c['ticketCode']}'),
               const Divider(),
-              Text('Sự kiện: ${c['eventTitle']}'),
               Text('Thời gian: ${c['checkedInAt']}'),
               Text('Người kiểm duyệt: ${c['checkedInBy']['name']} (${c['checkedInBy']['email']})'),
             ],
@@ -533,8 +941,6 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    
     final filteredCheckIns = _checkIns.where((c) {
       final code = (c['ticketCode'] ?? '').toString().toLowerCase();
       final name = (c['attendeeName'] ?? '').toString().toLowerCase();
@@ -542,46 +948,51 @@ class _CheckInsTabState extends ConsumerState<_CheckInsTab> {
       return code.contains(query) || name.contains(query);
     }).toList();
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: TextField(
-            decoration: InputDecoration(
-              labelText: 'Tìm kiếm theo tên hoặc mã vé',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-            onChanged: (val) {
-              setState(() => _searchQuery = val);
-            },
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.eventTitle)),
+      body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Tìm kiếm theo tên hoặc mã vé',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                  },
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  itemCount: filteredCheckIns.length,
+                  itemBuilder: (context, index) {
+                    final c = filteredCheckIns[index];
+                    return ListTile(
+                      onTap: () => _showCheckInDetail(c),
+                      leading: c['photoUrl'] != null 
+                          ? Image.network(
+                              '${AppConfig.baseUrl}${c['photoUrl']}',
+                              width: 50, height: 50, fit: BoxFit.cover,
+                              headers: _token != null ? {'Authorization': 'Bearer $_token'} : null,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                            )
+                          : const Icon(Icons.person, size: 50),
+                      title: Text('${c['attendeeName']} - ${c['ticketCode']}'),
+                      subtitle: Text('Người check-in: ${c['checkedInBy']['name']}'),
+                      isThreeLine: true,
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: filteredCheckIns.length,
-            itemBuilder: (context, index) {
-              final c = filteredCheckIns[index];
-              return ListTile(
-                onTap: () => _showCheckInDetail(c),
-                leading: c['photoUrl'] != null 
-                    ? Image.network(
-                        '${AppConfig.baseUrl}${c['photoUrl']}',
-                        width: 50, height: 50, fit: BoxFit.cover,
-                        headers: _token != null ? {'Authorization': 'Bearer $_token'} : null,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-                      )
-                    : const Icon(Icons.person, size: 50),
-                title: Text('${c['attendeeName']} - ${c['ticketCode']}'),
-                subtitle: Text('Sự kiện: ${c['eventTitle']}\nNgười check-in: ${c['checkedInBy']['name']}'),
-                isThreeLine: true,
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }

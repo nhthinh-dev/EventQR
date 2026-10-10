@@ -16,6 +16,7 @@ public class EventResponse {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private Integer capacity;
+    private Integer cancelDeadlineHours;
     private Long remainingSeats;
     private String status;
 
@@ -29,6 +30,7 @@ public class EventResponse {
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())
                 .capacity(event.getCapacity())
+                .cancelDeadlineHours(event.getCancelDeadlineHours())
                 .remainingSeats(event.getCapacity() - confirmedBookings)
                 .status(event.getStatus().name())
                 .build();

@@ -13,6 +13,14 @@ class TicketRepository {
   final Dio _dio;
   TicketRepository(this._dio);
 
+    Future<void> cancelTicket(int ticketId) async {
+    try {
+      await _dio.put('/api/tickets/$ticketId/cancel');
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? e.message);
+    }
+  }
+
   Future<List<TicketResponse>> getMyTickets() async {
     final response = await _dio.get('/api/tickets/me');
     final List content = response.data; // API trả về thẳng mảng JSON

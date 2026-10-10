@@ -73,6 +73,7 @@ public class EventService {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .capacity(request.getCapacity())
+                .cancelDeadlineHours(request.getCancelDeadlineHours() != null ? request.getCancelDeadlineHours() : 72)
                 .status(request.getStatus() != null ? EventStatus.valueOf(request.getStatus().toUpperCase()) : EventStatus.OPEN)
                 .build();
                 
@@ -94,6 +95,7 @@ public class EventService {
         event.setStartTime(request.getStartTime());
         event.setEndTime(request.getEndTime());
         event.setCapacity(request.getCapacity());
+        if (request.getCancelDeadlineHours() != null) event.setCancelDeadlineHours(request.getCancelDeadlineHours());
         
         if (request.getStatus() != null) {
             try {

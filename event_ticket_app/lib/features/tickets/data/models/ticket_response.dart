@@ -5,6 +5,8 @@ class TicketResponse {
   final int eventId;
   final String eventTitle;
   final DateTime startTime;
+  final DateTime endTime;
+  final int cancelDeadlineHours;
   final String location;
 
   TicketResponse({
@@ -14,6 +16,8 @@ class TicketResponse {
     required this.eventId,
     required this.eventTitle,
     required this.startTime,
+    required this.endTime,
+    required this.cancelDeadlineHours,
     required this.location,
   });
 
@@ -25,6 +29,8 @@ class TicketResponse {
       eventId: json['eventId'],
       eventTitle: json['eventTitle'],
       startTime: DateTime.parse(json['startTime']),
+      endTime: DateTime.parse(json['endTime']),
+      cancelDeadlineHours: json['cancelDeadlineHours'] ?? 72,
       location: json['location'],
     );
   }

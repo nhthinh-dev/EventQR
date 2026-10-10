@@ -8,6 +8,7 @@ class EventResponse {
   final int totalTickets;
   final int availableTickets;
   final String status;
+  final int cancelDeadlineHours;
   final String? imageUrl;
 
   EventResponse({
@@ -20,6 +21,7 @@ class EventResponse {
     required this.totalTickets,
     required this.availableTickets,
     required this.status,
+    required this.cancelDeadlineHours,
     this.imageUrl,
   });
 
@@ -34,6 +36,7 @@ class EventResponse {
       totalTickets: json['capacity'] ?? 0,
       availableTickets: json['remainingSeats'] ?? 0,
       status: json['status'] ?? 'UNKNOWN',
+      cancelDeadlineHours: json['cancelDeadlineHours'] ?? 72,
       imageUrl: json['imageUrl'],
     );
   }

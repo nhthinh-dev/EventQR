@@ -68,6 +68,45 @@ class AdminRepository {
     }
   }
 
+      Future<List<Map<String, dynamic>>> getEventAttendees(int eventId) async {
+    try {
+      final response = await _dio.get('/api/events/$eventId/attendees');
+      return List<Map<String, dynamic>>.from(response.data);
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? e.message);
+    }
+  }
+
+  Future<Map<String, dynamic>> getEventDetail(int eventId) async {
+    try {
+      final response = await _dio.get('/api/events/$eventId');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? e.message);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEventsCheckInSummary() async {
+    try {
+      final response = await _dio.get('/api/admin/events-checkin-summary');
+      return List<Map<String, dynamic>>.from(response.data);
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? e.message);
+    }
+  }
+
+  Future<List<dynamic>> getCheckInsByEvent(int eventId, int page, int size) async {
+    try {
+      final response = await _dio.get(
+        '/api/admin/events/$eventId/check-ins',
+        queryParameters: {'page': page, 'size': size},
+      );
+      return response.data['content'] as List;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? e.message);
+    }
+  }
+
   Future<List<dynamic>> getCheckIns(int page, int size) async {
     try {
       final response = await _dio.get('/api/admin/check-ins?page=$page&size=$size');

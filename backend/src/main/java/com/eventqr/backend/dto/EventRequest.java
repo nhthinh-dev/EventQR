@@ -26,6 +26,7 @@ public class EventRequest {
     @NotNull(message = "Sá»©c chá»©a khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng")
     @Min(value = 1, message = "Sá»©c chá»©a pháº£i lá»›n hÆ¡n 0")
     private Integer capacity;
+    private Integer cancelDeadlineHours;
     
     private String status;
 }

@@ -18,6 +18,7 @@ public class Event {
     @Column(name = "start_time", nullable = false) private LocalDateTime startTime;
     @Column(name = "end_time", nullable = false) private LocalDateTime endTime;
     @Column(nullable = false) private Integer capacity;
+    @Column(name = "cancel_deadline_hours", nullable = false) private Integer cancelDeadlineHours = 72;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private EventStatus status;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @PrePersist protected void onCreate() { if (createdAt == null) createdAt = LocalDateTime.now(); }

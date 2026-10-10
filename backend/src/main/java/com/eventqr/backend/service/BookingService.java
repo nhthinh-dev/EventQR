@@ -91,6 +91,30 @@ public class BookingService {
         return "EVT-" + year + "-" + randomStr;
     }
 
+        @Transactional
+    public void cancelTicket(Long ticketId, Long userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new AppException(ErrorCode.TICKET_NOT_FOUND));
+                
+        Booking booking = ticket.getBooking();
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return; // Already cancelled
+        }
+
+        Event event = booking.getEvent();
+        if (java.time.LocalDateTime.now().isAfter(event.getEndTime().minusHours(event.getCancelDeadlineHours() != null ? event.getCancelDeadlineHours() : 72))) {
+            throw new AppException(ErrorCode.CANCEL_TOO_LATE);
+        }
+
+        ticketRepository.delete(ticket);
+        bookingRepository.delete(booking);
+    }
+
     public List<TicketResponse> getMyBookings(Long userId) {
         return bookingRepository.findByUserId(userId).stream()
                 .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
